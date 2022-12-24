@@ -71,7 +71,7 @@ predict_parser.add_argument(
 if __name__ == "__main__":
     args = parser.parse_args()
     logging.basicConfig(
-        filename=settings.LOGS_PATH / f"{args.task}_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}.log",
+        filename=settings.LOGS_PATH / f"{args.task}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log",
         format="%(asctime)s - [%(levelname)s] - %(message)s",
         level=logging.INFO,
     )
