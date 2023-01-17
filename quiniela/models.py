@@ -26,6 +26,8 @@ class QuinielaModel:
             to be of a low division and is assigned bad scores.
             This is a good approach if enough training seasons are considered
             (at least 5), with good results when training with 10 seasons (2010-2020).
+        
+        These features are stored in the file "train_features.json".
     """
     def __init__(self):
         n_neighbors = 7
@@ -69,7 +71,7 @@ class QuinielaModel:
 
         with open("train_features.json", "w") as outfile:
             json.dump(dic_feature_data, outfile)
-
+        print("Data stored in 'train_features.json' file.")
         col_names = ["rank_diff", "goal_diff", "home_team", "away_team"]
         x_train = train_df[col_names]
         y_train = train_df.results
