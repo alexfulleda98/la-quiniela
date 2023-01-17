@@ -1,6 +1,9 @@
 ## LaQuiniela of LaLiga
 
-Team members: Oriol Bárcenas - Rut Blanco - Alex Fulleda 
+Team members: 
+- Oriol Bárcenas López, 1480897
+- Rut Blanco Prieto, 1490761
+- Àlex Fulleda García, 1458304
 Github repository link: https://github.com/alexfulledagarcia/la-quiniela
 
 This repo contains the skeleton for you to build your first ML project. Use the data in ```laliga.sqlite``` to build a ML model that predicts the outcome of a matchday in LaLiga (Spanish Football League).
