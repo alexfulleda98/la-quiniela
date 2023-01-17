@@ -51,12 +51,12 @@ class QuinielaModel:
         self.model.fit(X, y)
 
     def predict(self, predict_data):
+        print(predict_data.to_string())
         with open("train_feature_results.json", "r") as result_input:
             results_dic = json.load(result_input)
         mod_predict_data = predict_data.copy(deep=True)
         mod_predict_data["win_diff"] = 0
         mod_predict_data["rank_diff"] = 0
-        print("progress : 'Generating Features ...'")
         for index, row in mod_predict_data.iterrows():
             try:
                 row["home_team"]
@@ -70,8 +70,6 @@ class QuinielaModel:
             except KeyError:
                 mod_predict_data.loc[row.name, "win_diff"] = 2
                 mod_predict_data.loc[row.name, "rank_diff"] = 0
-
-
         col_names = ["win_diff", "rank_diff"]
         X = mod_predict_data[col_names]
         pred_results = self.model.predict(X)
@@ -126,9 +124,9 @@ def direct_confrontations_and_ranking(Team1, Team2, df, abs_rankings):
             ranking_team2.append(abs_rankings[season][Team2])
         except KeyError:
             pass
-    avg_ranking_team1 = round(np.average(ranking_team1), 3)
-    avg_ranking_team2 = round(np.average(ranking_team2), 3)
-    return [float(team1_scoring - team2_scoring), float(avg_ranking_team1 - avg_ranking_team2)]
+    avg_ranking_team1 = np.average(ranking_team1)
+    avg_ranking_team2 = np.average(ranking_team2)
+    return [float(team1_scoring - team2_scoring), round(float(avg_ranking_team1 - avg_ranking_team2), 2)]
 
 
 def dic_saver(team1, team2, df, results_dic, abs_rankings):
@@ -156,6 +154,6 @@ def update_progress(progress):
         progress = 1
         status = "Training the model...\r\n"
     block = int(round(barLength*progress))
-    text = "\rProgress: [{0}] {1}% {2}".format("█"*block + "-"*(barLength-block), round(progress*100, 2), status)
+    text = "\rGenerating features: [{0}] {1}% {2}".format("█"*block + "-"*(barLength-block), round(progress*100, 2), status)
     sys.stdout.write(text)
     sys.stdout.flush()
