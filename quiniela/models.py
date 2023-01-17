@@ -8,7 +8,25 @@ warnings.filterwarnings("ignore")
 
 
 class QuinielaModel:
+    """ This model is based on a Kneighbors classification with the following configuration:
+            - n_neighbors = 7.
+            - weights = "uniform".
+            - algorithm = "ball_tree".
 
+        It uses 4 features:
+            - Average abolute ranking in the training seasons. If a team is in season 2,
+                its absolute ranking is considered, adding the teams in season 1.
+            - Average net goals (scored - conceded) in the training seasons.
+            - Home team, encoded as a number.
+            - Away team, encoded as a number.
+
+        The features calculated in the training step (av. ranking and
+            net goals) are then considered in the prediction step
+            If a team is not found in the training step, it is considered
+            to be of a low division and is assigned bad scores.
+            This is a good approach if enough training seasons are considered
+            (at least 5), with good results when training with 10 seasons (2010-2020).
+    """
     def __init__(self):
         n_neighbors = 7
         weights = "uniform"
@@ -106,11 +124,17 @@ class QuinielaModel:
             pickle.dump(self, f)
 
 
-def inv_conv(lst):
-    return [-i for i in lst]
-
-
 def avg_ranking_goals(team, df, gen_dic, res_dic):
+    """ Function used to obtain the average ranking and goals for every team.
+    This data is then used in the prediction.
+
+    Args:
+        team (string): name of the team to compute the averages
+        df (DataFrame): training dataframe
+        gen_dic (dictionary): general information dictionary containing data
+            about the ranking and goals per season
+        res_dic (dictionary): dictionary where results are stored
+    """
     ranking = []
     net_goals = []
     seasons = df["season"].unique()
