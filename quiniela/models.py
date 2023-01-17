@@ -10,69 +10,85 @@ warnings.filterwarnings("ignore")
 class QuinielaModel:
 
     def __init__(self):
-        n_neighbors = 30
-        weights = "distance"
-        self.model = neighbors.KNeighborsClassifier(n_neighbors, weights=weights, algorithm="auto")
+        n_neighbors = 7
+        weights = "uniform"
+        algorithm = "ball_tree"
+        self.model = neighbors.KNeighborsClassifier(n_neighbors, weights=weights, algorithm=algorithm)
 
     def train(self, train_data):
-        results_dic = {}
-        train_data = train_data.dropna(subset="score")
-        train_data[["home_goals", "away_goals"]] = train_data["score"].str.split(":", expand=True).astype(float)
-        train_data["goal diff"] = (train_data["home_goals"] - train_data["away_goals"])
-        train_data["results"] = np.where(train_data["goal diff"] > 0, "1", np.where(train_data["goal diff"] < 0, "2", "X"))
-        with open("abs_rankings.json", "r") as ranking_input:
-            abs_rankings = json.load(ranking_input)
-        x_train = train_data.copy(deep=True)
-        x_train["win_diff"] = 0
-        x_train["rank_diff"] = 0
-        st_index = x_train.index[0]
-        end_index = x_train.index[-1]
+        train_df = train_data.copy(deep=True)
+        train_df = train_df.dropna(subset="score")
+        train_df[["home_goals", "away_goals"]] = train_df["score"].str.split(":", expand=True).astype(float)
+        train_df["goal diff"] = (train_df["home_goals"] - train_df["away_goals"])
+        train_df["results"] = np.where(train_df["goal diff"] > 0, "1", np.where(train_df["goal diff"] < 0, "2", "X"))
+        dic_import_data = {}
+        with open("feature_data.json", "r") as infile:
+            dic_import_data = json.load(infile)
+
+        dic_feature_data = {}
+
+        train_df["rank_diff"] = 0
+        train_df["goal_diff"] = 0
+
+        st_index = train_df.index[0]
+        end_index = train_df.index[-1]
         total_elems = end_index - st_index
         curr_progress = 0
-        for index, row in x_train.iterrows():
+
+        for index, row in train_df.iterrows():
             home_team = row["home_team"]
             away_team = row["away_team"]
-            try:
-                results_dic[home_team][away_team]
-            except KeyError:
-                dic_saver(home_team, away_team, x_train, results_dic, abs_rankings)
-            # results_dic [team1][team2] = [win1-win2, rank1-rank2]
-            x_train.loc[row.name, "win_diff"] = results_dic[home_team][away_team][0]
-            x_train.loc[row.name, "rank_diff"] = results_dic[home_team][away_team][1]
+            if home_team not in dic_feature_data:
+                avg_ranking_goals(home_team, train_df, dic_import_data, dic_feature_data)
+            if away_team not in dic_feature_data:
+                avg_ranking_goals(away_team, train_df, dic_import_data, dic_feature_data)
+            train_df.loc[row.name, "rank_diff"] = dic_feature_data[home_team][0] - dic_feature_data[away_team][0]
+            train_df.loc[row.name, "goal_diff"] = dic_feature_data[home_team][1] - dic_feature_data[away_team][1]
+            train_df.loc[row.name, "home_team"] = dic_import_data["teams_codif"][home_team]
+            train_df.loc[row.name, "away_team"] = dic_import_data["teams_codif"][away_team]
             update_progress(float(curr_progress/total_elems))
             curr_progress += 1
-        with open("train_feature_results.json", "w") as outfile:
-            json.dump(results_dic, outfile)
 
-        col_names = ["win_diff", "rank_diff"]
-        X = x_train[col_names]
-        y = x_train.results
+        with open("train_features.json", "w") as outfile:
+            json.dump(dic_feature_data, outfile)
 
-        self.model.fit(X, y)
+        col_names = ["rank_diff", "goal_diff", "home_team", "away_team"]
+        x_train = train_df[col_names]
+        y_train = train_df.results
+        self.model.fit(x_train, y_train)
 
     def predict(self, predict_data):
-        print(predict_data.to_string())
-        with open("train_feature_results.json", "r") as result_input:
-            results_dic = json.load(result_input)
-        mod_predict_data = predict_data.copy(deep=True)
-        mod_predict_data["win_diff"] = 0
-        mod_predict_data["rank_diff"] = 0
-        for index, row in mod_predict_data.iterrows():
-            try:
-                row["home_team"]
-            except KeyError:
-                continue
+        test_df = predict_data.copy(deep=True)
+        with open("train_features.json", "r") as infile:
+            dic_feature_data = json.load(infile)
+        with open("feature_data.json", "r") as infile:
+            dic_import_data = json.load(infile)
+
+        for index, row in test_df.iterrows():
             home_team = row["home_team"]
             away_team = row["away_team"]
-            try:
-                mod_predict_data.loc[row.name, "win_diff"] = results_dic[home_team][away_team][0]
-                mod_predict_data.loc[row.name, "rank_diff"] = results_dic[home_team][away_team][1]
-            except KeyError:
-                mod_predict_data.loc[row.name, "win_diff"] = 2
-                mod_predict_data.loc[row.name, "rank_diff"] = 0
-        col_names = ["win_diff", "rank_diff"]
-        X = mod_predict_data[col_names]
-        pred_results = self.model.predict(X)
+            if home_team not in dic_feature_data:
+                avg_rank_home = 30
+                avg_goals_home = -10
+            else:
+                avg_rank_home = dic_feature_data[home_team][0]
+                avg_goals_home = dic_feature_data[home_team][1]
+
+            if away_team not in dic_feature_data:
+                avg_rank_away = 30
+                avg_goals_away = -10
+            else:
+                avg_rank_away = dic_feature_data[away_team][0]
+                avg_goals_away = dic_feature_data[away_team][1]
+
+            test_df.loc[row.name, "rank_diff"] = avg_rank_home - avg_rank_away
+            test_df.loc[row.name, "goal_diff"] = avg_goals_home - avg_goals_away
+            test_df.loc[row.name, "home_team"] = dic_import_data["teams_codif"][home_team]
+            test_df.loc[row.name, "away_team"] = dic_import_data["teams_codif"][away_team]
+
+        col_names = ["rank_diff", "goal_diff", "home_team", "away_team"]
+        x_test = test_df[col_names]
+        pred_results = self.model.predict(x_test)
         return pred_results
 
     @classmethod
@@ -94,49 +110,22 @@ def inv_conv(lst):
     return [-i for i in lst]
 
 
-def direct_confrontations_and_ranking(Team1, Team2, df, abs_rankings):
-    ranking_team1 = []
-    ranking_team2 = []
-    df3 = df.loc[((df["home_team"] == Team2) & (df["away_team"] == Team1)) | ((df["home_team"] == Team1) & (df["away_team"] == Team2))]
-    df3["Winner"] = np.where(df3["goal diff"] > 0, df3.home_team.values, np.where(df3["goal diff"] < 0, df3.away_team.values, "tie"))
-    direct_confrontation_count = df3["Winner"].value_counts()
-    if Team1 not in direct_confrontation_count and Team2 not in direct_confrontation_count:
-        team1_scoring = 0
-        team2_scoring = 0
-    elif Team1 not in direct_confrontation_count or Team2 not in direct_confrontation_count:
-        if Team1 not in direct_confrontation_count:
-            team1_scoring = 0
-            team2_scoring = direct_confrontation_count[Team2]
-        else:
-            team1_scoring = direct_confrontation_count[Team1]
-            team2_scoring = 0
-    else:
-        team1_scoring = direct_confrontation_count[Team1]
-        team2_scoring = direct_confrontation_count[Team2]
-
-    seasons = df3["season"].unique()
+def avg_ranking_goals(team, df, gen_dic, res_dic):
+    ranking = []
+    net_goals = []
+    seasons = df["season"].unique()
     for season in seasons:
         try:
-            ranking_team1.append(abs_rankings[season][Team1])
+            ranking.append(gen_dic["seasonal_data"][season][team][0])
         except KeyError:
             pass
         try:
-            ranking_team2.append(abs_rankings[season][Team2])
+            net_goals.append(gen_dic["seasonal_data"][season][team][1])
         except KeyError:
             pass
-    avg_ranking_team1 = np.average(ranking_team1)
-    avg_ranking_team2 = np.average(ranking_team2)
-    return [float(team1_scoring - team2_scoring), round(float(avg_ranking_team1 - avg_ranking_team2), 2)]
-
-
-def dic_saver(team1, team2, df, results_dic, abs_rankings):
-    subdic_direct = {}
-    subdic_inv = {}
-    direct_conf_res = direct_confrontations_and_ranking(team1, team2, df, abs_rankings)
-    subdic_direct[team2] = direct_conf_res
-    subdic_inv[team1] = inv_conv(direct_conf_res)
-    results_dic[team1] = subdic_direct
-    results_dic[team2] = subdic_inv
+    avg_ranking = round(np.average(ranking), 3)
+    avg_net_goals = round(np.average(net_goals), 3)
+    res_dic[team] = [avg_ranking, avg_net_goals]
 
 
 def update_progress(progress):
